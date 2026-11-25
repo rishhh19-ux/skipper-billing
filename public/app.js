@@ -1,6 +1,17 @@
-// Skipper Billing System - Mobile & iOS POS Logic
+// Skipper Billing System - Mobile & iOS POS Logic with Multi-User Auth
 let cart = [];
 let lastCreatedBill = null;
+let currentUser = null;
+
+// Auth Elements
+const loginModal = document.getElementById('loginModal');
+const loginForm = document.getElementById('loginForm');
+const loginUsernameInput = document.getElementById('loginUsername');
+const loginPasswordInput = document.getElementById('loginPassword');
+const loginSubmitBtn = document.getElementById('loginSubmitBtn');
+const userNameDisplay = document.getElementById('userNameDisplay');
+const logoutBtn = document.getElementById('logoutBtn');
+const navAnalyticsBtn = document.querySelector('button[data-tab="tab-analytics"]');
 
 // DOM Elements
 const addItemForm = document.getElementById('addItemForm');
@@ -34,6 +45,108 @@ const modalPrintBtn = document.getElementById('modalPrintBtn');
 const modalCloseBtn = document.getElementById('modalCloseBtn');
 const modalWaPreviewText = document.getElementById('modalWaPreviewText');
 
+// ==========================================
+// 🔐 AUTHENTICATION & ROLE-BASED ACCESS
+// ==========================================
+
+function checkAuth() {
+  const saved = localStorage.getItem('skipper_pos_user');
+  if (saved) {
+    try {
+      currentUser = JSON.parse(saved);
+    } catch (e) {
+      currentUser = null;
+    }
+  }
+
+  if (!currentUser) {
+    loginModal.classList.add('show');
+    if (navAnalyticsBtn) navAnalyticsBtn.style.display = 'none';
+    if (userNameDisplay) userNameDisplay.textContent = '🔒 Not Signed In';
+    return false;
+  }
+
+  // User is authenticated
+  loginModal.classList.remove('show');
+
+  const roleIcon = currentUser.role === 'admin' ? '👑' : '🛍️';
+  if (userNameDisplay) {
+    userNameDisplay.textContent = `${roleIcon} ${currentUser.name} (${currentUser.role.toUpperCase()})`;
+  }
+
+  // Role permissions
+  if (currentUser.role === 'admin') {
+    if (navAnalyticsBtn) navAnalyticsBtn.style.display = 'flex';
+  } else {
+    // Cashier: hide sensitive store revenue analytics
+    if (navAnalyticsBtn) navAnalyticsBtn.style.display = 'none';
+  }
+
+  return true;
+}
+
+// Login Handler
+async function performLogin(username, password) {
+  loginSubmitBtn.disabled = true;
+  loginSubmitBtn.textContent = 'Verifying...';
+
+  try {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+
+    const data = await res.json();
+
+    if (data.success && data.user) {
+      currentUser = data.user;
+      localStorage.setItem('skipper_pos_user', JSON.stringify(currentUser));
+      showToast(data.message || 'Login successful!', 'success');
+      checkAuth();
+      loginForm.reset();
+      itemNameInput.focus();
+    } else {
+      showToast(data.message || 'Authentication failed', 'error');
+    }
+  } catch (err) {
+    showToast('Failed to connect to authentication service', 'error');
+  } finally {
+    loginSubmitBtn.disabled = false;
+    loginSubmitBtn.textContent = '🔐 Sign In to Terminal';
+  }
+}
+
+// Submit Login Form
+loginForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  performLogin(loginUsernameInput.value.trim(), loginPasswordInput.value);
+});
+
+// Quick 1-Click Login Helper for Demo accounts
+window.quickLogin = (user, pass) => {
+  loginUsernameInput.value = user;
+  loginPasswordInput.value = pass;
+  performLogin(user, pass);
+};
+
+// Logout Handler
+logoutBtn.addEventListener('click', () => {
+  if (confirm('Sign out of the billing register?')) {
+    localStorage.removeItem('skipper_pos_user');
+    currentUser = null;
+    showToast('Logged out successfully', 'success');
+    checkAuth();
+  }
+});
+
+// Initial auth check on load
+checkAuth();
+
+// ==========================================
+// 🔔 AUDIO & INTERACTIVE POS LOGIC
+// ==========================================
+
 // Web Audio Cash Register Chime
 function playCashChime() {
   try {
@@ -41,17 +154,16 @@ function playCashChime() {
     if (!AudioContext) return;
     const ctx = new AudioContext();
 
-    // High cheerful two-tone ding
     const osc1 = ctx.createOscillator();
     const osc2 = ctx.createOscillator();
     const gain = ctx.createGain();
 
     osc1.type = 'sine';
-    osc1.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
-    osc1.frequency.setValueAtTime(880.0, ctx.currentTime + 0.1); // A5
+    osc1.frequency.setValueAtTime(587.33, ctx.currentTime);
+    osc1.frequency.setValueAtTime(880.0, ctx.currentTime + 0.1);
 
     osc2.type = 'triangle';
-    osc2.frequency.setValueAtTime(1174.66, ctx.currentTime + 0.1); // D6
+    osc2.frequency.setValueAtTime(1174.66, ctx.currentTime + 0.1);
 
     gain.gain.setValueAtTime(0.18, ctx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.55);
@@ -64,9 +176,7 @@ function playCashChime() {
     osc2.start(ctx.currentTime + 0.1);
     osc1.stop(ctx.currentTime + 0.55);
     osc2.stop(ctx.currentTime + 0.55);
-  } catch (e) {
-    // Audio context may require initial user tap on iOS Safari
-  }
+  } catch (e) {}
 }
 
 // Live Clock
@@ -83,11 +193,20 @@ updateClock();
 // Tab Navigation
 document.querySelectorAll('.nav-btn').forEach((btn) => {
   btn.addEventListener('click', () => {
+    if (!checkAuth()) return;
+
+    const tabId = btn.getAttribute('data-tab');
+
+    // Protect Analytics tab for admin only
+    if (tabId === 'tab-analytics' && currentUser.role !== 'admin') {
+      showToast('Admin privilege required for store analytics', 'error');
+      return;
+    }
+
     document.querySelectorAll('.nav-btn').forEach((b) => b.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach((tab) => tab.classList.remove('active'));
 
     btn.classList.add('active');
-    const tabId = btn.getAttribute('data-tab');
     const target = document.getElementById(tabId);
     if (target) target.classList.add('active');
 
@@ -120,6 +239,7 @@ document.querySelectorAll('.pay-btn').forEach((label) => {
 // Add Item
 addItemForm.addEventListener('submit', (e) => {
   e.preventDefault();
+  if (!checkAuth()) return;
 
   const name = itemNameInput.value.trim();
   const quantity = Math.max(1, parseInt(itemQtyInput.value, 10) || 1);
@@ -242,6 +362,7 @@ function buildWhatsAppMessage(bill) {
     .join('\n');
 
   const rewardPoints = Math.round(bill.grandTotal / 10);
+  const billedByStr = bill.billedBy ? `👤 *Cashier:* ${bill.billedBy}\n` : '';
 
   return (
 `✨ *SKIPPER STORE - DIGITAL INVOICE* ✨
@@ -251,7 +372,7 @@ Thank you for shopping with us today. Here is your official e-bill copy:
 
 🧾 *Invoice #:* ${bill.invoiceNumber}
 📅 *Date:* ${new Date(bill.createdAt || Date.now()).toLocaleDateString('en-IN')}
-💳 *Payment Mode:* ${bill.paymentMethod}
+${billedByStr}💳 *Payment Mode:* ${bill.paymentMethod}
 
 🛍️ *Purchased Items:*
 ${itemsText}
@@ -273,7 +394,7 @@ Show this bill on your next visit to receive a *complimentary 5% OFF*! ☕🎉
 function getWhatsAppUrl(phone, message) {
   let cleanPhone = (phone || '').replace(/\D/g, '');
   if (cleanPhone.length === 10) {
-    cleanPhone = '91' + cleanPhone; // Default to India (+91)
+    cleanPhone = '91' + cleanPhone;
   }
 
   const encoded = encodeURIComponent(message);
@@ -284,6 +405,8 @@ function getWhatsAppUrl(phone, message) {
 
 // Submit Bill
 submitBillBtn.addEventListener('click', async () => {
+  if (!checkAuth()) return;
+
   if (cart.length === 0) {
     showToast('Please add at least one item to bill', 'error');
     return;
@@ -306,6 +429,7 @@ submitBillBtn.addEventListener('click', async () => {
     discount: billDiscount,
     paymentMethod: selectedPayment,
     notes: billNotes.value.trim(),
+    billedBy: currentUser ? currentUser.name : 'Store Cashier',
   };
 
   submitBillBtn.disabled = true;
@@ -331,7 +455,7 @@ submitBillBtn.addEventListener('click', async () => {
       // Populate Success Modal
       modalInvoiceNo.textContent = bill.invoiceNumber;
       modalGrandTotal.textContent = `₹${bill.grandTotal.toFixed(2)}`;
-      modalCustomerName.textContent = `Billed to: ${bill.customer.name} ${bill.customer.phone ? `(${bill.customer.phone})` : ''}`;
+      modalCustomerName.textContent = `Billed to: ${bill.customer.name} ${bill.customer.phone ? `(${bill.customer.phone})` : ''} • By ${bill.billedBy || 'Staff'}`;
 
       const waMsg = buildWhatsAppMessage(bill);
       const waUrl = getWhatsAppUrl(bill.customer.phone, waMsg);
@@ -391,6 +515,8 @@ async function loadHistory() {
       return;
     }
 
+    const isAdmin = currentUser && currentUser.role === 'admin';
+
     historyTableBody.innerHTML = result.data
       .map((bill) => {
         const date = new Date(bill.createdAt).toLocaleDateString('en-IN', {
@@ -407,10 +533,17 @@ async function loadHistory() {
         const waMsg = buildWhatsAppMessage(bill);
         const waUrl = getWhatsAppUrl(bill.customer.phone, waMsg);
 
+        const deleteButtonHtml = isAdmin
+          ? `<button onclick="deleteBill('${bill._id}')" class="del-btn" style="margin-left: 4px;" title="Delete Bill">🗑️</button>`
+          : '';
+
         return `
         <tr>
           <td><strong>${bill.invoiceNumber}</strong></td>
-          <td>${date}</td>
+          <td>
+            ${date}
+            ${bill.billedBy ? `<br><small style="color:#64748b; font-weight:600;">By: ${bill.billedBy}</small>` : ''}
+          </td>
           <td>
             <strong>${bill.customer.name}</strong>
             ${bill.customer.phone ? `<br><small style="color:#64748b">📱 ${bill.customer.phone}</small>` : ''}
@@ -424,7 +557,7 @@ async function loadHistory() {
           <td style="text-align: center; white-space: nowrap;">
             <a href="${waUrl}" target="_blank" class="btn btn-whatsapp" style="padding: 4px 10px; height: 32px; font-size: 12px;">💬 WhatsApp</a>
             <a href="/api/bills/${bill._id}/print" target="_blank" class="btn btn-outline" style="padding: 4px 10px; height: 32px; font-size: 12px;">🖨️</a>
-            <button onclick="deleteBill('${bill._id}')" class="del-btn" style="margin-left: 4px;">🗑️</button>
+            ${deleteButtonHtml}
           </td>
         </tr>`;
       })
@@ -438,8 +571,13 @@ async function loadHistory() {
   }
 }
 
-// Delete Bill
+// Delete Bill (Admin only)
 window.deleteBill = async (id) => {
+  if (!currentUser || currentUser.role !== 'admin') {
+    showToast('Only admins can delete bills', 'error');
+    return;
+  }
+
   if (!confirm('Are you sure you want to delete this invoice?')) return;
 
   try {
@@ -463,8 +601,13 @@ document.getElementById('historySearchInput').addEventListener('input', () => {
 document.getElementById('historyStatusFilter').addEventListener('change', loadHistory);
 document.getElementById('refreshHistoryBtn').addEventListener('click', loadHistory);
 
-// Analytics
+// Analytics (Admin only)
 async function loadAnalytics() {
+  if (!currentUser || currentUser.role !== 'admin') {
+    showToast('Admin privilege required', 'error');
+    return;
+  }
+
   try {
     const res = await fetch('/api/bills/stats');
     const result = await res.json();

@@ -20,6 +20,7 @@ exports.createBill = async (req, res) => {
       paymentMethod = 'Cash',
       status = 'paid',
       notes = '',
+      billedBy = 'Admin',
     } = req.body;
 
     if (!items || !Array.isArray(items) || items.length === 0) {
@@ -66,6 +67,7 @@ exports.createBill = async (req, res) => {
       paymentMethod,
       status,
       notes,
+      billedBy,
     });
 
     const savedBill = await newBill.save();

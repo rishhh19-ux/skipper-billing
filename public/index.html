@@ -42,6 +42,10 @@
 
       <div class="nav-meta">
         <div id="liveClock" class="live-clock">--:--:--</div>
+        <div id="userProfileBadge" class="user-profile-badge">
+          <span id="userNameDisplay">👑 Admin</span>
+          <button id="logoutBtn" class="logout-btn" title="Sign Out">Sign Out</button>
+        </div>
       </div>
     </header>
 
@@ -350,6 +354,46 @@
             </a>
             <button id="modalCloseBtn" type="button" class="btn btn-primary flex-1">
               ⚡ Next Bill
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- LOGIN OVERLAY MODAL -->
+    <div id="loginModal" class="login-overlay show">
+      <div class="login-card">
+        <div class="login-header">
+          <div class="login-logo">⚡</div>
+          <h2>SKIPPER POS LOGIN</h2>
+          <p>Sign in with your cashier or admin account to start billing</p>
+        </div>
+
+        <form id="loginForm" class="login-form">
+          <div class="form-group">
+            <label>Username</label>
+            <input type="text" id="loginUsername" placeholder="e.g. admin or cashier1" required autocomplete="username">
+          </div>
+          <div class="form-group">
+            <label>Password</label>
+            <input type="password" id="loginPassword" placeholder="Enter password" required autocomplete="current-password">
+          </div>
+
+          <button type="submit" id="loginSubmitBtn" class="btn btn-primary btn-block login-btn">
+            🔐 Sign In to Terminal
+          </button>
+        </form>
+
+        <div class="quick-logins">
+          <span class="quick-label">⚡ 1-Click Fast Login (Demo Accounts):</span>
+          <div class="quick-btns">
+            <button type="button" class="quick-btn admin" onclick="quickLogin('admin', 'admin123')">
+              👑 <strong>Admin</strong> (admin / admin123)
+            </button>
+            <button type="button" class="quick-btn cashier" onclick="quickLogin('cashier1', 'cashier123')">
+              🛍️ <strong>Cashier 1</strong> (cashier1 / cashier123)
+            </button>
+            <button type="button" class="quick-btn cashier" onclick="quickLogin('cashier2', 'cashier123')">
+              🛍️ <strong>Cashier 2</strong> (cashier2 / cashier123)
             </button>
           </div>
         </div>

@@ -108,6 +108,11 @@ const billSchema = new mongoose.Schema(
       trim: true,
       default: '',
     },
+    billedBy: {
+      type: String,
+      trim: true,
+      default: 'Admin',
+    },
   },
   {
     timestamps: true,

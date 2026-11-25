@@ -5,6 +5,7 @@ const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
 const billRoutes = require('./routes/billRoutes');
+const authRoutes = require('./routes/authRoutes');
 
 const app = express();
 app.use(cors());
@@ -53,7 +54,8 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Mount bill routes
+// Mount routes
+app.use('/api/auth', authRoutes);
 app.use('/api/bills', billRoutes);
 
 const PORT = process.env.PORT || 5000;
