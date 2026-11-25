@@ -123,13 +123,6 @@ loginForm.addEventListener('submit', (e) => {
   performLogin(loginUsernameInput.value.trim(), loginPasswordInput.value);
 });
 
-// Quick 1-Click Login Helper for Demo accounts
-window.quickLogin = (user, pass) => {
-  loginUsernameInput.value = user;
-  loginPasswordInput.value = pass;
-  performLogin(user, pass);
-};
-
 // Logout Handler
 logoutBtn.addEventListener('click', () => {
   if (confirm('Sign out of the billing register?')) {
