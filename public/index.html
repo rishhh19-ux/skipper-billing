@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Skipper POS">
+  <meta name="theme-color" content="#1a56db">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%231a56db'/><text x='50' y='68' font-size='55' text-anchor='middle' fill='white'>⚡</text></svg>">
+  
+  <title>Skipper Billing System & POS</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Top Navigation Bar -->
+    <header class="top-navbar">
+      <div class="nav-brand">
+        <div class="brand-logo">⚡</div>
+        <div class="brand-text">
+          <h1>SKIPPER POS</h1>
+          <span>Smart Invoicing & Retail</span>
+        </div>
+      </div>
+
+      <nav class="nav-tabs">
+        <button class="nav-btn active" data-tab="tab-pos">
+          <span class="icon">🛒</span> <span>New Bill</span>
+        </button>
+        <button class="nav-btn" data-tab="tab-history">
+          <span class="icon">📋</span> <span>History</span>
+        </button>
+        <button class="nav-btn" data-tab="tab-analytics">
+          <span class="icon">📈</span> <span>Analytics</span>
+        </button>
+      </nav>
+
+      <div class="nav-meta">
+        <div id="liveClock" class="live-clock">--:--:--</div>
+      </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="content-wrapper">
+      <!-- Notification Banner -->
+      <div id="toastNotification" class="toast"></div>
+
+      <!-- TAB 1: NEW BILL (POS) -->
+      <section id="tab-pos" class="tab-content active">
+        <div class="pos-layout">
+          <!-- Left Column: Customer & Items -->
+          <div class="pos-main">
+            <!-- Customer Section -->
+            <div class="card customer-card">
+              <div class="card-header">
+                <h3>Customer Information</h3>
+              </div>
+              <div class="form-row">
+                <div class="form-group flex-2">
+                  <label>Customer Name *</label>
+                  <input type="text" id="custName" placeholder="e.g. Rahul Sharma" value="Walk-in Customer" required>
+                </div>
+                <div class="form-group flex-2">
+                  <label>WhatsApp / Phone Number</label>
+                  <div class="input-with-prefix">
+                    <span class="prefix">📱</span>
+                    <input type="tel" id="custPhone" placeholder="10-digit number (e.g. 9876543210)">
+                  </div>
+                </div>
+                <div class="form-group flex-2">
+                  <label>Email (Optional)</label>
+                  <input type="email" id="custEmail" placeholder="customer@example.com">
+                </div>
+              </div>
+            </div>
+
+            <!-- Quick Add Bar -->
+            <div class="card item-entry-card">
+              <div class="card-header">
+                <h3>Add Items</h3>
+              </div>
+              <form id="addItemForm" class="item-form-row">
+                <div class="form-group flex-3">
+                  <label>Item Name *</label>
+                  <input type="text" id="itemName" placeholder="Scan barcode or type item name..." required autofocus autocomplete="off">
+                </div>
+                <div class="form-group flex-1">
+                  <label>Qty</label>
+                  <input type="number" id="itemQty" min="1" value="1" required>
+                </div>
+                <div class="form-group flex-1">
+                  <label>Price (₹)</label>
+                  <input type="number" id="itemPrice" min="0" step="0.01" placeholder="0.00" required>
+                </div>
+                <div class="form-group flex-1">
+                  <label>Disc (₹)</label>
+                  <input type="number" id="itemDiscount" min="0" step="0.01" value="0">
+                </div>
+                <div class="form-group action-group">
+                  <button type="submit" class="btn btn-secondary add-item-btn">+ Add Item</button>
+                </div>
+              </form>
+            </div>
+
+            <!-- Cart Table -->
+            <div class="card cart-table-card">
+              <div class="card-header space-between">
+                <h3>Current Cart (<span id="cartCount">0</span> items)</h3>
+                <button type="button" id="clearCartBtn" class="btn-text text-danger">Clear Cart</button>
+              </div>
+              <div class="table-container">
+                <table class="data-table" id="cartTable">
+                  <thead>
+                    <tr>
+                      <th style="width: 45px;">#</th>
+                      <th>Item Description</th>
+                      <th style="width: 100px; text-align: center;">Qty</th>
+                      <th style="width: 100px; text-align: right;">Rate</th>
+                      <th style="width: 80px; text-align: right;">Disc</th>
+                      <th style="width: 110px; text-align: right;">Total</th>
+                      <th style="width: 50px; text-align: center;"></th>
+                    </tr>
+                  </thead>
+                  <tbody id="cartTableBody">
+                    <tr class="empty-row">
+                      <td colspan="7">No items added yet. Type an item above to start billing.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right Column: Checkout & Summary -->
+          <div class="pos-sidebar">
+            <div class="card summary-card">
+              <div class="card-header">
+                <h3>Bill Calculation</h3>
+              </div>
+
+              <div class="summary-breakdown">
+                <div class="summary-line">
+                  <span>Subtotal</span>
+                  <span id="summarySubtotal" class="amount">₹0.00</span>
+                </div>
+
+                <div class="summary-line">
+                  <div class="tax-rate-label">
+                    <span>GST / Tax Rate</span>
+                    <select id="taxRateSelect" class="inline-select">
+                      <option value="0">0%</option>
+                      <option value="5">5%</option>
+                      <option value="12">12%</option>
+                      <option value="18" selected>18%</option>
+                      <option value="28">28%</option>
+                    </select>
+                  </div>
+                  <span id="summaryTaxAmount" class="amount">₹0.00</span>
+                </div>
+
+                <div class="summary-line">
+                  <span>Special Discount (₹)</span>
+                  <input type="number" id="billDiscountInput" class="inline-number-input" value="0" min="0" step="0.5">
+                </div>
+
+                <div class="summary-divider"></div>
+
+                <div class="summary-line grand-total-line">
+                  <span>Grand Total</span>
+                  <span id="summaryGrandTotal" class="grand-amount">₹0.00</span>
+                </div>
+              </div>
+
+              <!-- Payment Method Selection -->
+              <div class="payment-method-section">
+                <label>Payment Method</label>
+                <div class="payment-buttons">
+                  <label class="pay-btn active">
+                    <input type="radio" name="payMethod" value="Cash" checked>
+                    <span>💵 Cash</span>
+                  </label>
+                  <label class="pay-btn">
+                    <input type="radio" name="payMethod" value="UPI">
+                    <span>📱 UPI / QR</span>
+                  </label>
+                  <label class="pay-btn">
+                    <input type="radio" name="payMethod" value="Card">
+                    <span>💳 Card</span>
+                  </label>
+                  <label class="pay-btn">
+                    <input type="radio" name="payMethod" value="Credit">
+                    <span>📝 Credit</span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="form-group notes-group">
+                <label>Notes / Order Reference</label>
+                <input type="text" id="billNotes" placeholder="e.g. Table 2 / Home delivery">
+              </div>
+
+              <!-- Checkout Actions -->
+              <div class="checkout-actions">
+                <button type="button" id="submitBillBtn" class="btn btn-primary btn-block checkout-btn">
+                  ⚡ Generate Bill & Share
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 2: BILL HISTORY -->
+      <section id="tab-history" class="tab-content">
+        <div class="card history-card">
+          <div class="card-header space-between flex-wrap">
+            <div class="header-title">
+              <h3>All Invoices</h3>
+              <p>Search, reprint, and resend digital bills via WhatsApp</p>
+            </div>
+            <div class="filter-controls">
+              <input type="text" id="historySearchInput" placeholder="🔍 Search by invoice # or customer...">
+              <select id="historyStatusFilter">
+                <option value="">All Statuses</option>
+                <option value="paid">Paid</option>
+                <option value="pending">Pending</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+              <button id="refreshHistoryBtn" class="btn btn-outline">🔄 Refresh</button>
+            </div>
+          </div>
+
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Invoice No</th>
+                  <th>Date & Time</th>
+                  <th>Customer</th>
+                  <th>Payment</th>
+                  <th>Items</th>
+                  <th style="text-align: right;">Total</th>
+                  <th style="text-align: center;">Status</th>
+                  <th style="text-align: center;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="historyTableBody">
+                <tr class="empty-row">
+                  <td colspan="8">Loading bills...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 3: ANALYTICS -->
+      <section id="tab-analytics" class="tab-content">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon revenue">💰</div>
+            <div class="stat-details">
+              <h4>Total Revenue</h4>
+              <h2 id="statTotalRevenue">₹0.00</h2>
+              <span class="stat-sub">Across all sales</span>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon orders">🧾</div>
+            <div class="stat-details">
+              <h4>Total Invoices</h4>
+              <h2 id="statTotalBills">0</h2>
+              <span class="stat-sub">Bills created</span>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon avg">📊</div>
+            <div class="stat-details">
+              <h4>Average Ticket Size</h4>
+              <h2 id="statAvgValue">₹0.00</h2>
+              <span class="stat-sub">Avg per bill</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="analytics-panels">
+          <div class="card panel-card">
+            <div class="card-header">
+              <h3>Payment Method Split</h3>
+            </div>
+            <div id="paymentBreakdownList" class="breakdown-list">
+              <p class="empty-text">No transaction data yet.</p>
+            </div>
+          </div>
+
+          <div class="card panel-card">
+            <div class="card-header">
+              <h3>Invoice Status Overview</h3>
+            </div>
+            <div id="statusBreakdownList" class="breakdown-list">
+              <p class="empty-text">No transaction data yet.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- SUCCESS BILL MODAL (WhatsApp Share & Print) -->
+    <div id="billSuccessModal" class="modal-overlay">
+      <div class="modal-card">
+        <div class="modal-header">
+          <div class="success-badge">✅</div>
+          <h3>Bill Created Successfully!</h3>
+          <p id="modalInvoiceNo" class="modal-inv-sub">INV-20261125-0001</p>
+        </div>
+
+        <div class="modal-body">
+          <div class="modal-total-box">
+            <span>Grand Total</span>
+            <h2 id="modalGrandTotal">₹0.00</h2>
+            <span id="modalCustomerName" class="cust-label">Billed to: Rahul Sharma</span>
+          </div>
+
+          <div class="modal-whatsapp-preview">
+            <div class="preview-header">
+              <span>💬 Creative WhatsApp Message Ready:</span>
+            </div>
+            <div class="preview-box">
+              <p>✨ <strong>SKIPPER STORE - DIGITAL INVOICE</strong> ✨</p>
+              <p id="modalWaPreviewText">Thank you for visiting! Your e-bill is ready...</p>
+              <p class="preview-tag">🎁 <em>Includes 5% loyalty coupon for next visit!</em></p>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <a id="modalWhatsAppBtn" href="#" target="_blank" class="btn btn-whatsapp btn-block">
+            💬 Send to Customer's WhatsApp
+          </a>
+          <div class="modal-sub-actions">
+            <a id="modalPrintBtn" href="#" target="_blank" class="btn btn-outline flex-1">
+              🖨️ View / Print
+            </a>
+            <button id="modalCloseBtn" type="button" class="btn btn-primary flex-1">
+              ⚡ Next Bill
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
